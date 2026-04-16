@@ -61,11 +61,24 @@ async function handleExpiredSession() {
   window.location.replace("/login?expired=1");
 }
 
+import { TOKEN_KEY } from "@/lib/auth";
+
+function getStoredToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
+  const token = getStoredToken();
+
   const res = await fetch(input, {
     credentials: "include",
     ...init,
     headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers || {}),
     },
   });

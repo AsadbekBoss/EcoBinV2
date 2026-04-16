@@ -6,15 +6,15 @@ import dynamic from "next/dynamic";
 import S from "./StatsPanel.module.css";
 import { apiFetch } from "@/lib/api/client";
 import Pagination from "@/components/ui/Pagination";
-
-const TripTrackMap = dynamic(() => import("./TripTrackMap"), { ssr: false });
 import {
   Satellite, RefreshCw, Car as CarIcon, Play, PauseCircle, WifiOff,
   Zap, Gauge, AlertTriangle, Trophy, Search, X,
-  TrendingUp, Clock, Timer, AlertCircle, BarChart2,
+  TrendingUp, Timer, AlertCircle, BarChart2,
   Activity, MapPin, Download, ChevronUp, ChevronDown,
   ChevronsUpDown, Flame, Route, Droplets,
 } from "lucide-react";
+
+const TripTrackMap = dynamic(() => import("./TripTrackMap"), { ssr: false });
 
 /* ─── Types ─────────────────────────────────── */
 type Status = "moving" | "stopped" | "offline";
@@ -54,6 +54,7 @@ type WeekDay = {
 };
 /* ─── Helpers ───────────────────────────────── */
 const REFRESH = 10, PAGE = 10, SPEED_ALERT = 90;
+// REFRESH used only for interval — no UI countdown
 
 const fmt    = (ms: number) => new Date(ms).toLocaleTimeString("uz-UZ", { hour12: false });
 const fmtSig = (s: number | null) =>
@@ -94,8 +95,6 @@ export default function StatsPanel() {
   const [agg,  setAgg]        = useState<Agg | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr]         = useState("");
-  const [updAt, setUpdAt]     = useState(0);
-  const [tick,  setTick]      = useState(0);
 
   /* Table */
   const [filter,  setFilter]  = useState<Filter>("all");
@@ -132,7 +131,6 @@ export default function StatsPanel() {
   const [mapTrip,       setMapTrip]       = useState<{ unitId: number; from: number; to: number; n: number } | null>(null);
 
   const rRef = useRef<any>(null);
-  const tRef = useRef<any>(null);
 
   /* ── Load fleet ── */
   async function load(reason: "manual" | "auto" = "manual") {
@@ -156,8 +154,6 @@ export default function StatsPanel() {
 
       setCars(newCars);
       setAgg(j?.stats ?? null);
-      setUpdAt(now);
-      setTick(0);
     } catch (e: any) { setErr(e?.message || "Xatolik"); }
     finally { if (reason === "manual") setLoading(false); }
   }
@@ -206,8 +202,7 @@ export default function StatsPanel() {
   useEffect(() => {
     load("manual");
     rRef.current = setInterval(() => load("auto"), REFRESH * 1000);
-    tRef.current = setInterval(() => setTick(p => p >= REFRESH ? REFRESH : p + 1), 1000);
-    return () => { clearInterval(rRef.current); clearInterval(tRef.current); };
+    return () => { clearInterval(rRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -249,7 +244,6 @@ export default function StatsPanel() {
     [cars]
   );
   const maxTop    = top3[0]?.speed || 1;
-  const progress  = Math.min(100, Math.round((tick / REFRESH) * 100));
   const speeding  = useMemo(() => cars.filter(c => c.speed > SPEED_ALERT), [cars]);
 
   const idleCars  = useMemo(() =>
@@ -301,17 +295,12 @@ export default function StatsPanel() {
               <Flame size={12}/>{speeding.length} tez!
             </span>
           )}
-          {loading
-            ? <span className={S.liveBadge}><span className={S.liveDot}/>Yangilanmoqda</span>
-            : updAt ? <span className={S.timeBadge}><Clock size={12}/>{fmt(updAt)}</span>
-            : null}
           <button className={S.refreshBtn} onClick={() => load("manual")} disabled={loading}>
             <RefreshCw size={13}/> Yangilash
           </button>
         </div>
       </div>
 
-      <div className={S.progTrack}><div className={S.progBar} style={{ width: `${progress}%` }}/></div>
       {err && <div className={S.errBox}>{err}</div>}
 
       {/* TABS */}
@@ -638,7 +627,6 @@ export default function StatsPanel() {
           {todayLoaded && (
             <>
               {todayErr && <div className={S.errBox}>{todayErr}</div>}
-              {todayLoading && <div className={S.loadingBar}><div className={S.loadingFill}/></div>}
               {todayCars && (() => {
                 const withIdle = [...todayCars].filter(c => c.idleMin > 0).sort((a, b) => b.idleMin - a.idleMin);
                 const totalL   = todayCars.reduce((s, c) => s + c.idleMin * 0.013, 0);
@@ -692,7 +680,6 @@ export default function StatsPanel() {
           )}
 
           {/* Load trigger for bugun tab */}
-          {todayLoading && !todayLoaded && <div className={S.loadingBar}><div className={S.loadingFill}/></div>}
         </div>
 
         {/* Activity ranking */}
@@ -764,7 +751,6 @@ export default function StatsPanel() {
             </div>
           </div>
           {vioErr && <div className={S.errBox}>{vioErr}</div>}
-          {vioLoading && <div className={S.loadingBar}><div className={S.loadingFill}/></div>}
           {!vioLoaded && !vioLoading && <div className={S.aEmpty}>Ma'lumotlarni yuklash uchun "Yuklash" tugmasini bosing</div>}
           {vioLoaded && violations.length === 0 && <div className={S.aEmptyGreen}>Bugun hech qanday tezlik buzilishi qayd etilmagan ✓</div>}
           {vioLoaded && violations.length > 0 && (
@@ -814,7 +800,6 @@ export default function StatsPanel() {
           </div>
 
           {weeklyErr && <div className={S.errBox}>{weeklyErr}</div>}
-          {weeklyLoading && <div className={S.loadingBar}><div className={S.loadingFill}/></div>}
           {!weeklyData && !weeklyLoading && !weeklyErr && <div className={S.aEmpty}>Yuqoridan mashina tanlang</div>}
 
           {weeklyData && (<>

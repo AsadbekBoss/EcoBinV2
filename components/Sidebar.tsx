@@ -86,6 +86,7 @@ export default function Sidebar({ basePath = "" }: { basePath?: string }) {
         label: t("statistics"),
         icon: "ri-bar-chart-box-line",
       });
+
     }
 
     if (role === "SUPER_ADMIN") {

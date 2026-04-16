@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { authExpiredJson, authExpiredText, isAuthStatus } from "@/lib/server/monitorAuth";
+import { authExpiredJson, authExpiredText, getTokenFromRequest, isAuthStatus } from "@/lib/server/monitorAuth";
 
 const base = process.env.API_BASE || process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8082";
 
 export async function GET(req: Request) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("monitor_token")?.value;
+  const token = await getTokenFromRequest(req);
 
   if (!token) {
     return authExpiredJson({ message: "Token topilmadi. Qayta login qiling." }, 401);
@@ -36,8 +34,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("monitor_token")?.value;
+  const token = await getTokenFromRequest(req);
   const body = await req.text();
 
   if (!token) {

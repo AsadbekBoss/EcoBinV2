@@ -20,6 +20,7 @@ export type Session = {
 const USERS_KEY = "monitor_users";
 const SESSION_KEY = "monitor_session";
 const SESSION_KEY_PERSIST = "monitor_session_persist";
+export const TOKEN_KEY = "monitor_token";
 
 function isBrowser() {
   return typeof window !== "undefined";
@@ -244,6 +245,12 @@ export async function login(
   };
 
   saveSession(s, remember);
+
+  // Token localStorage'ga saqlanadi
+  if (data?.token) {
+    localStorage.setItem(TOKEN_KEY, String(data.token));
+  }
+
   return s;
 }
 
@@ -254,6 +261,7 @@ export async function logout() {
 
   sessionStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(SESSION_KEY_PERSIST);
+  localStorage.removeItem(TOKEN_KEY);
 }
 
 /* =========================

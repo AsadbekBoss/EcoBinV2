@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { authExpiredJson, authExpiredText, isAuthStatus } from "@/lib/server/monitorAuth";
+import { authExpiredJson, authExpiredText, getTokenFromRequest, isAuthStatus } from "@/lib/server/monitorAuth";
 
 const base = process.env.API_BASE || process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8082";
 
@@ -20,17 +19,12 @@ function normalizeId(raw: string) {
   return String(n);
 }
 
-async function getToken() {
-  const cookieStore = await cookies();
-  return cookieStore.get("monitor_token")?.value || "";
-}
-
 export async function PUT(req: Request, ctx: Ctx) {
   const { id: raw } = await ctx.params;
   const id = normalizeId(raw);
-  if (!id) return bad(`ID noto‘g‘ri: ${String(raw)}`);
+  if (!id) return bad(`ID noto’g’ri: ${String(raw)}`);
 
-  const token = await getToken();
+  const token = await getTokenFromRequest(req);
   if (!token) {
     return authExpiredJson({ message: "Token topilmadi (monitor_token). Qayta login qiling." }, 401);
   }
@@ -68,12 +62,12 @@ export async function PUT(req: Request, ctx: Ctx) {
   });
 }
 
-export async function DELETE(_req: Request, ctx: Ctx) {
+export async function DELETE(req: Request, ctx: Ctx) {
   const { id: raw } = await ctx.params;
   const id = normalizeId(raw);
-  if (!id) return bad(`ID noto‘g‘ri: ${String(raw)}`);
+  if (!id) return bad(`ID noto’g’ri: ${String(raw)}`);
 
-  const token = await getToken();
+  const token = await getTokenFromRequest(req);
   if (!token) {
     return authExpiredJson({ message: "Token topilmadi (monitor_token). Qayta login qiling." }, 401);
   }

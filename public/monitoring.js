@@ -9,6 +9,15 @@
   let carBridgeHandler = null;
 
   // ===== Helpers =====
+  function getAuthHeaders() {
+    try {
+      const token = localStorage.getItem("monitor_token");
+      return token ? { Authorization: "Bearer " + token } : {};
+    } catch {
+      return {};
+    }
+  }
+
   const fmtTime = (d = new Date()) =>
     d.toLocaleString("uz-UZ", { hour12: false });
 
@@ -35,6 +44,7 @@
     const dy = a.lng - b.lng;
     return dx * dx + dy * dy;
   }
+
 
   function pointInRing(lng, lat, ring) {
     let inside = false;
@@ -304,6 +314,7 @@
       const res = await fetch("/api/trashbins?size=1000&page=0", {
         cache: "no-store",
         credentials: "include",
+        headers: getAuthHeaders(),
       });
 
       const j = await res.json().catch(() => ({}));

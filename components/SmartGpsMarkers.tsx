@@ -80,9 +80,11 @@ export default function SmartGpsMarkers() {
   const { theme, isMobile } = useAppShell();
   const [visible, setVisible] = useState(false);
   const [active, setActive] = useState<Car | null>(null);
-  const [trackStatus, setTrackStatus] = useState<"idle"|"loading"|"ok"|"empty"|"error">("idle");
-  const [trackMsg, setTrackMsg] = useState("");
+  const activeRef = useRef<Car | null>(null);
   const [trackDailyKm, setTrackDailyKm] = useState<number | null>(null);
+
+  // activeRef — always mirrors `active` so drawCarsOnce (stale closure) can read current value
+  useEffect(() => { activeRef.current = active; }, [active]);
 
   // Leaflet
   const layerRef = useRef<any>(null);
@@ -90,6 +92,9 @@ export default function SmartGpsMarkers() {
 
   // Direction (bearing degrees, 0=North) per car id
   const headingRef = useRef<Map<number, number>>(new Map());
+
+  // Last rendered icon key per car — "speedBand:heading10" to avoid redundant setIcon calls
+  const iconKeyRef = useRef<Map<number, string>>(new Map());
 
   // Data cache
   const lastGoodCarsRef = useRef<Map<number, Car>>(new Map());
@@ -201,6 +206,20 @@ export default function SmartGpsMarkers() {
       }
     `;
     document.head.appendChild(style);
+  }
+
+  /** Tezlik zonasi (icon rang uchun) */
+  function speedBand(s: number): number {
+    if (s <= 3)  return 0;
+    if (s <= 20) return 1;
+    if (s <= 60) return 2;
+    if (s <= 90) return 3;
+    return 4;
+  }
+
+  /** Icon key — faqat shu o'zgarganda setIcon chaqiriladi */
+  function iconKey(speed: number, heading: number): string {
+    return `${speedBand(speed)}:${Math.round(heading / 10)}`;
   }
 
   /** Ikki GPS nuqta o'rtasidagi yo'nalish (0=North, 90=East, 180=South, 270=West) */
@@ -457,13 +476,9 @@ export default function SmartGpsMarkers() {
   async function drawTrack24h(unitId: number) {
     if (trackDrawingRef.current) return;
     trackDrawingRef.current = true;
-    setTrackStatus("loading");
-    setTrackMsg("");
 
     const ctx = await waitForMap();
     if (!ctx) {
-      setTrackStatus("error");
-      setTrackMsg("Xarita topilmadi");
       trackDrawingRef.current = false;
       return;
     }
@@ -479,8 +494,6 @@ export default function SmartGpsMarkers() {
       const res = await apiFetch(`/api/smartgps/track?unitId=${unitId}`, { cache: "no-store" });
 
       if (!res.ok) {
-        setTrackStatus("error");
-        setTrackMsg(`Server xato: ${res.status}`);
         trackDrawingRef.current = false;
         return;
       }
@@ -502,8 +515,6 @@ export default function SmartGpsMarkers() {
         allPts.filter((_: any, i: number) => i % 2 === 0);
 
       if (!pts.length) {
-        setTrackStatus("empty");
-        setTrackMsg(`Ma'lumot yo'q (${allPts.length} nuqta keldi)`);
         setTrackDailyKm(null);
         trackDrawingRef.current = false;
         return;
@@ -595,11 +606,7 @@ export default function SmartGpsMarkers() {
       } catch {}
 
       const maxSpd = Math.round(Math.max(...pts.map(p => p.speed)));
-      setTrackStatus("ok");
-      setTrackMsg(`${pts.length} nuqta • maks ${maxSpd} km/h`);
     } catch (e) {
-      setTrackStatus("error");
-      setTrackMsg(e instanceof Error ? e.message : "Noma'lum xato");
     } finally {
       trackDrawingRef.current = false;
     }
@@ -743,6 +750,7 @@ export default function SmartGpsMarkers() {
     lastSeenAtRef.current.clear();
     lastGoodCarsRef.current.clear();
     headingRef.current.clear();
+    iconKeyRef.current.clear();
     animRef.current.clear();
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
@@ -764,6 +772,13 @@ export default function SmartGpsMarkers() {
       lastGoodCarsRef.current.clear();
       carsFresh.forEach((c) => lastGoodCarsRef.current.set(c.id, c));
       syncSmartGPSApi();
+
+      // Modal ochiq bo'lsa, aktiv mashinaning yangi ma'lumotlarini ko'rsat
+      const currentActive = activeRef.current;
+      if (currentActive) {
+        const fresh = lastGoodCarsRef.current.get(currentActive.id);
+        if (fresh) setActive(fresh);
+      }
     }
 
     const now = performance.now();
@@ -776,8 +791,10 @@ export default function SmartGpsMarkers() {
       const currentHeading = headingRef.current.get(c.id) ?? 0;
 
       if (!m) {
+        const initKey = iconKey(c.speed, currentHeading);
         const icon = makeCarIcon(c.speed, currentHeading);
         m = L.marker([c.lat, c.lng], { icon, zIndexOffset: 5000 });
+        iconKeyRef.current.set(c.id, initKey);
 
         m.on("click", async () => {
           const latest = lastGoodCarsRef.current.get(c.id) ?? c;
@@ -799,8 +816,12 @@ export default function SmartGpsMarkers() {
           headingRef.current.set(c.id, newHeading);
         }
 
-        // Marker ikonini yangilash (yo'nalish yoki tezlik o'zgarsa)
-        m.setIcon(makeCarIcon(c.speed, newHeading));
+        // Marker ikonini faqat zona yoki yo'nalish o'zgarganda yangilaymiz
+        const newKey = iconKey(c.speed, newHeading);
+        if (iconKeyRef.current.get(c.id) !== newKey) {
+          m.setIcon(makeCarIcon(c.speed, newHeading));
+          iconKeyRef.current.set(c.id, newKey);
+        }
 
         if (jump > FAR_JUMP_DEG || !carsFresh) {
           m.setLatLng([c.lat, c.lng]);
@@ -929,8 +950,6 @@ export default function SmartGpsMarkers() {
   function closeModal() {
     setActive(null);
     clearTrack();
-    setTrackStatus("idle");
-    setTrackMsg("");
     setTrackDailyKm(null);
     setDragPos(null);
   }
@@ -1151,13 +1170,7 @@ export default function SmartGpsMarkers() {
               <div style={cardStyle}>
                 <div style={{ fontSize: 11, color: modalMuted, fontWeight: 600 }}>Bugungi yo’l</div>
                 <div style={{ fontWeight: 800, fontSize: 15, color: modalText }}>
-                  {trackDailyKm != null
-                    ? `${trackDailyKm} km`
-                    : trackStatus === "idle"
-                    ? <span style={{ fontSize: 11, color: modalMuted }}>Track bosing</span>
-                    : trackStatus === "loading"
-                    ? "..."
-                    : "—"}
+                  {trackDailyKm != null ? `${trackDailyKm} km` : "—"}
                 </div>
               </div>
             </div>
@@ -1199,69 +1212,21 @@ export default function SmartGpsMarkers() {
 
               <button
                 onClick={() => drawTrack24h(active.id)}
-                disabled={trackStatus === "loading"}
                 style={{
                   padding: "11px 8px",
                   borderRadius: 12,
                   border: isDark ? "1px solid rgba(255,255,255,.12)" : "1px solid rgba(15,23,42,.12)",
-                  background: trackStatus === "ok"
-                    ? (isDark ? "rgba(239,68,68,.20)" : "rgba(239,68,68,.14)")
-                    : trackStatus === "error" || trackStatus === "empty"
-                    ? "rgba(239,68,68,.12)"
-                    : softPanel,
+                  background: softPanel,
                   color: buttonText,
-                  cursor: trackStatus === "loading" ? "wait" : "pointer",
+                  cursor: "pointer",
                   fontWeight: 800,
                   fontSize: 13,
                 }}
               >
-                {trackStatus === "loading" ? "⏳..." : "🧵 Track"}
+                Track
               </button>
 
             </div>
-
-            {trackMsg ? (
-              <div style={{
-                fontSize: 12,
-                padding: "6px 10px",
-                borderRadius: 8,
-                background: trackStatus === "ok"
-                  ? (isDark ? "rgba(255,255,255,.06)" : "rgba(15,23,42,.04)")
-                  : trackStatus === "error" || trackStatus === "empty"
-                  ? "rgba(239,68,68,.10)"
-                  : "rgba(37,99,235,.08)",
-                color: trackStatus === "error" || trackStatus === "empty" ? "#dc2626" : modalMuted,
-              }}>
-                Track: {trackMsg}
-              </div>
-            ) : null}
-
-            {/* Tezlik legendasi — faqat track chizilganda */}
-            {trackStatus === "ok" && (
-              <div style={{
-                padding: "8px 10px",
-                borderRadius: 10,
-                background: isDark ? "rgba(255,255,255,.05)" : "rgba(15,23,42,.04)",
-                fontSize: 11,
-                fontWeight: 700,
-              }}>
-                <div style={{ color: modalMuted, marginBottom: 5 }}>Tezlik ranglari:</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 10px" }}>
-                  {[
-                    { color: "#94a3b8", label: "0–5 km/h" },
-                    { color: "#3b82f6", label: "5–30 km/h" },
-                    { color: "#22c55e", label: "30–60 km/h" },
-                    { color: "#f59e0b", label: "60–90 km/h" },
-                    { color: "#ef4444", label: "90+ km/h"  },
-                  ].map(({ color, label }) => (
-                    <span key={label} style={{ display: "flex", alignItems: "center", gap: 4, color: modalText }}>
-                      <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0, display: "inline-block" }}/>
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {isMobile && <div style={{ height: 8 }} />}
           </div>

@@ -82,7 +82,7 @@ export default function BinModal() {
 
             <div className="binActionRow">
               <button className="btn binBtn primary" id="mFocus" type="button">
-                Haritada ko‘rsat
+                Haritada ko’rsat
               </button>
 
               <button

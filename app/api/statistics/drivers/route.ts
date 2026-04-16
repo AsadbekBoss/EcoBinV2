@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { authExpiredJson, isAuthStatus } from "@/lib/server/monitorAuth";
+import { authExpiredJson, getTokenFromRequest, isAuthStatus } from "@/lib/server/monitorAuth";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const base = process.env.API_BASE || process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8082";
 
-    const cookieStore = await cookies();
-    const token = cookieStore.get("monitor_token")?.value;
+    const token = await getTokenFromRequest(req);
 
     if (!token) {
       return authExpiredJson({ ok: false, message: "Token topilmadi" }, 401);

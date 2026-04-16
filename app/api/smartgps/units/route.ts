@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+
+// SID keshi — server restart bo'lguncha saqlanadi
+let cachedSid: string | null = null;
+let sidExpiry = 0; // ms timestamp
+const SID_TTL_MS = 20 * 60 * 1000; // 20 daqiqa
+
 async function fetchJsonSafe(r: Response) {
   const text = await r.text();
   try {
@@ -7,6 +13,7 @@ async function fetchJsonSafe(r: Response) {
     return { raw: text };
   }
 }
+
 async function wialonCall(base: string, sid: string, svc: string, params: any) {
   const body = new URLSearchParams();
   body.set("sid", sid);
@@ -20,7 +27,7 @@ async function wialonCall(base: string, sid: string, svc: string, params: any) {
     body,
   });
 
-    return fetchJsonSafe(r);
+  return fetchJsonSafe(r);
 }
 
 async function loginToken(base: string, token: string) {
@@ -35,7 +42,27 @@ async function loginToken(base: string, token: string) {
     body,
   });
 
-    return fetchJsonSafe(r);
+  return fetchJsonSafe(r);
+}
+
+async function getOrRefreshSid(base: string, token: string): Promise<string | null> {
+  // Kesh hali amal qilsa — qayta login qilmaymiz
+  if (cachedSid && Date.now() < sidExpiry) {
+    return cachedSid;
+  }
+
+  const loginData = await loginToken(base, token);
+  const sid = loginData?.eid || loginData?.sid;
+
+  if (loginData?.error || !sid) {
+    cachedSid = null;
+    sidExpiry = 0;
+    return null;
+  }
+
+  cachedSid = sid;
+  sidExpiry = Date.now() + SID_TTL_MS;
+  return sid;
 }
 
 export async function GET() {
@@ -43,16 +70,15 @@ export async function GET() {
     const base = process.env.SMARTGPS_BASE!;
     const token = process.env.SMARTGPS_TOKEN!;
 
-    // 1) LOGIN
-    const loginData = await loginToken(base, token);
-  const sid = loginData?.eid || loginData?.sid;
+    // 1) SID olish (keshdan yoki yangi login)
+    let sid = await getOrRefreshSid(base, token);
 
-if (loginData?.error || !sid) {
-  return NextResponse.json(
-    { ok: false, error: "SmartGPS login failed", loginData },
-    { status: 401 }
-  );
-}
+    if (!sid) {
+      return NextResponse.json(
+        { ok: false, error: "SmartGPS login failed" },
+        { status: 401 }
+      );
+    }
     // 2) UNITS OLISH
     const params = {
       spec: {
@@ -67,16 +93,27 @@ if (loginData?.error || !sid) {
       to: 0,
     };
 
-    const unitsData = await wialonCall(base, sid, "core/search_items", params);
+    let unitsData = await wialonCall(base, sid, "core/search_items", params);
+
+    // SID muddati tugagan bo'lsa (error 1 yoki 4) — qayta login va retry
+    if (unitsData?.error === 1 || unitsData?.error === 4) {
+      cachedSid = null;
+      sidExpiry = 0;
+      sid = await getOrRefreshSid(base, token);
+      if (!sid) {
+        return NextResponse.json({ ok: false, error: "SmartGPS re-login failed" }, { status: 401 });
+      }
+      unitsData = await wialonCall(base, sid, "core/search_items", params);
+    }
 
     // 3) MAPGA KERAK FORMAT
     const items = Array.isArray(unitsData?.items) ? unitsData.items : [];
     if (unitsData?.error) {
-  return NextResponse.json(
-    { ok: false, error: "SmartGPS units error", unitsData },
-    { status: 502 }
-  );
-}
+      return NextResponse.json(
+        { ok: false, error: "SmartGPS units error", unitsData },
+        { status: 502 }
+      );
+    }
 
     const cars = items
       .map((u: any) => {

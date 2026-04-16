@@ -94,6 +94,7 @@ export async function POST(req: Request) {
     const res = NextResponse.json({
       ok: true,
       role,
+      token,
       username: data?.username || username,
     });
 

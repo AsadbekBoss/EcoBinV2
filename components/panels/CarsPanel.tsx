@@ -91,25 +91,18 @@ export default function CarsPanel() {
   const [cars, setCars] = useState<Car[]>([]);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [page, setPage] = useState(1);
 
   const REFRESH_SEC = 5;
-  const [tick, setTick] = useState(0);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const OFFLINE_MINS = 2;
 
   async function load() {
     try {
-      setLoading(true);
       setErr("");
-
       const res = await apiFetch("/api/smartgps/units", { cache: "no-store" });
       const data = await res.json();
-
       const arr = Array.isArray(data?.cars) ? data.cars : [];
-
       const cleaned = arr
         .map((c: any) => ({
           id: Number(c?.id),
@@ -120,45 +113,25 @@ export default function CarsPanel() {
           time: c?.time == null ? null : Number(c.time),
           mileage: c?.mileage == null ? null : Number(c.mileage),
         }))
-        .filter(
-          (c: Car) =>
-            Number.isFinite(c.id) &&
-            Number.isFinite(c.lat) &&
-            Number.isFinite(c.lng)
+        .filter((c: Car) =>
+          Number.isFinite(c.id) && Number.isFinite(c.lat) && Number.isFinite(c.lng)
         );
-
       setCars(cleaned);
-      setLastUpdatedAt(Date.now());
-      setTick(0);
     } catch (e: any) {
       setErr(e?.message || "Mashinalarni yuklashda xato");
-      setCars([]);
-    } finally {
-      setLoading(false);
     }
   }
 
   useEffect(() => {
     load();
-
-    const refreshTimer = setInterval(() => {
-      load();
-    }, REFRESH_SEC * 1000);
-
-    tickRef.current = setInterval(() => {
-      setTick((prev) => (prev >= REFRESH_SEC ? REFRESH_SEC : prev + 1));
-    }, 1000);
-
-    return () => {
-      clearInterval(refreshTimer);
-      if (tickRef.current) clearInterval(tickRef.current);
-    };
+    const t = setInterval(() => load(), REFRESH_SEC * 1000);
+    return () => clearInterval(t);
   }, []);
 
   const enriched = useMemo(() => {
     return cars.map((c) => {
       const mins = ageMinutes(c.time ?? null);
-      const offline = mins > 10;
+      const offline = mins > OFFLINE_MINS;
       const moving = !offline && (c.speed || 0) > 2;
 
       const status: CarStatus = offline
@@ -218,7 +191,6 @@ export default function CarsPanel() {
     }
   }, [page, totalPages]);
 
-  const progress = Math.min(100, Math.round((tick / REFRESH_SEC) * 100));
 
   function scrollToMap() {
     const mapEl =
@@ -331,38 +303,10 @@ export default function CarsPanel() {
 
           <div className={Style.meta}>
             <span>
-              Jami ko‘rinmoqda: <b>{shown.length}</b> / <b>{stats.total}</b> • Sahifa <b>{currentPage}</b> / <b>{totalPages}</b>
+              Jami: <b>{stats.total}</b> • Sahifa <b>{currentPage}</b> / <b>{totalPages}</b>
             </span>
-            <span className={Style.sep}>•</span>
-            <span>
-              Yangilanish: <b>{REFRESH_SEC}s</b>
-            </span>
-            <span className={Style.sep}>•</span>
-            <span>
-              Oxirgi yangilanish:{" "}
-              <b>{lastUpdatedAt ? fmtTime(lastUpdatedAt) : "—"}</b>
-            </span>
-          </div>
-
-          <div
-            className={Style.progressTrack}
-            title={`Har ${REFRESH_SEC} sekundda avtomatik yangilanadi`}
-          >
-            <div
-              className={Style.progressBar}
-              style={{ width: `${progress}%` }}
-            />
           </div>
         </div>
-
-        <button
-          className={Style.refreshBtn}
-          type="button"
-          onClick={load}
-          disabled={loading}
-        >
-          {loading ? "Yuklanmoqda..." : "⟳ Yangilash"}
-        </button>
       </div>
 
       {err ? <div className={Style.alert}>{err}</div> : null}

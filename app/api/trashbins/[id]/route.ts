@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { authExpiredJson, isAuthStatus } from "@/lib/server/monitorAuth";
+import { authExpiredJson, getTokenFromRequest, isAuthStatus } from "@/lib/server/monitorAuth";
 
 function getBase() {
   return process.env.API_BASE || process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8082";
@@ -13,8 +12,7 @@ export async function PUT(req: Request, ctx: Ctx) {
     const { id } = await ctx.params;
 
     const base = getBase();
-    const cookieStore = await cookies();
-    const token = cookieStore.get("monitor_token")?.value;
+    const token = await getTokenFromRequest(req);
 
     if (!token) {
       return authExpiredJson({ ok: false, message: "Token yo‘q. Login qiling." }, 401);
@@ -56,13 +54,12 @@ export async function PUT(req: Request, ctx: Ctx) {
   }
 }
 
-export async function DELETE(_req: Request, ctx: Ctx) {
+export async function DELETE(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
 
     const base = getBase();
-    const cookieStore = await cookies();
-    const token = cookieStore.get("monitor_token")?.value;
+    const token = await getTokenFromRequest(req);
 
     if (!token) {
       return authExpiredJson({ ok: false, message: "Token yo‘q. Login qiling." }, 401);
