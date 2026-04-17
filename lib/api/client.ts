@@ -20,19 +20,7 @@ async function readJsonSafe(res: Response): Promise<JsonLike> {
 
 function looksLikeAuthPayload(payload: JsonLike) {
   if (!payload || typeof payload !== "object") return false;
-
-  if (payload["authExpired"] === true) return true;
-
-  const message = String(
-    payload["message"] || payload["error"] || payload["debug"] || ""
-  ).toLowerCase();
-
-  return (
-    message.includes("token") ||
-    message.includes("unauthorized") ||
-    message.includes("forbidden") ||
-    message.includes("sessiya")
-  );
+  return payload["authExpired"] === true;
 }
 
 async function handleExpiredSession() {
