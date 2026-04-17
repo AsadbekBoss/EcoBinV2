@@ -100,7 +100,7 @@ export default function CarsPanel() {
   async function load() {
     try {
       setErr("");
-      const res = await apiFetch("/api/smartgps/units", { cache: "no-store" });
+      const res = await apiFetch("/proxy/smartgps/units", { cache: "no-store" });
       const data = await res.json();
       const arr = Array.isArray(data?.cars) ? data.cars : [];
       const cleaned = arr

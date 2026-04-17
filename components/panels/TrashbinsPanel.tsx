@@ -108,7 +108,7 @@ export default function TrashbinsPanel() {
     setErr(null);
 
     try {
-      const r = await apiFetch("/api/trashbins?page=0&size=1000", {
+      const r = await apiFetch("/proxy/trashbins?page=0&size=1000", {
         cache: "no-store",
       });
 
@@ -133,7 +133,7 @@ export default function TrashbinsPanel() {
     setDriversErr(null);
 
     try {
-      const r = await apiFetch("/api/users/drivers", { cache: "no-store" });
+      const r = await apiFetch("/proxy/users/drivers", { cache: "no-store" });
       const j = await r.json().catch(() => ({}));
 
       if (!r.ok) {
@@ -359,7 +359,7 @@ export default function TrashbinsPanel() {
     }
 
     try {
-      const r = await apiFetch("/api/trashbins", {
+      const r = await apiFetch("/proxy/trashbins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -405,7 +405,7 @@ export default function TrashbinsPanel() {
     }
 
     try {
-      const r = await apiFetch(`/api/trashbins/${editing.id}`, {
+      const r = await apiFetch(`/proxy/trashbins/${editing.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -436,7 +436,7 @@ export default function TrashbinsPanel() {
     setOkMsg(null);
 
     try {
-      const r = await apiFetch(`/api/trashbins/${id}`, { method: "DELETE" });
+      const r = await apiFetch(`/proxy/trashbins/${id}`, { method: "DELETE" });
       const j = await r.json().catch(() => ({}));
 
       if (!r.ok) {
@@ -503,7 +503,7 @@ export default function TrashbinsPanel() {
           <div>
             <div className={Style.cardTitle}>Ro‘yxat</div>
             <div className={Style.cardHint}>
-              Backend’dan olinadi: <span className={Style.mono}>GET /api/trashbins</span> • Ko‘rinmoqda <span className={Style.mono}>{filteredBins.length}</span> / <span className={Style.mono}>{bins.length}</span>
+              Backend’dan olinadi: <span className={Style.mono}>GET /proxy/trashbins</span> • Ko‘rinmoqda <span className={Style.mono}>{filteredBins.length}</span> / <span className={Style.mono}>{bins.length}</span>
             </div>
           </div>
           <div className={Style.cardHint}>Sahifa <span className={Style.mono}>{currentPage}/{totalPages}</span></div>

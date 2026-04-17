@@ -396,7 +396,7 @@ export default function SmartGpsMarkers() {
 
   async function fetchCarsRobust(): Promise<Car[] | null> {
     try {
-      const res = await apiFetch("/api/smartgps/units", { cache: "no-store" });
+      const res = await apiFetch("/proxy/smartgps/units", { cache: "no-store" });
       if (!res.ok) {
         failStreakRef.current += 1;
         console.warn("SmartGPS units res not ok:", res.status);
@@ -491,7 +491,7 @@ export default function SmartGpsMarkers() {
     }
 
     try {
-      const res = await apiFetch(`/api/smartgps/track?unitId=${unitId}`, { cache: "no-store" });
+      const res = await apiFetch(`/proxy/smartgps/track?unitId=${unitId}`, { cache: "no-store" });
 
       if (!res.ok) {
         trackDrawingRef.current = false;

@@ -52,7 +52,7 @@ export default function CarsPage() {
   const [filter, setFilter] = useState<Filter>("all");
 
 async function load() {
-  const res = await fetch("/api/smartgps/units", { cache: "no-store" });
+  const res = await fetch("/proxy/smartgps/units", { cache: "no-store" });
   const data = await res.json();
 
   const arr = Array.isArray(data?.cars) ? data.cars : [];

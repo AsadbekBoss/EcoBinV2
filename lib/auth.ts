@@ -219,7 +219,7 @@ export async function login(
 ): Promise<Session> {
   if (!isBrowser()) throw new Error("login can run only in browser");
 
-  const res = await fetch("/api/auth/login", {
+  const res = await fetch("/proxy/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -257,7 +257,7 @@ export async function login(
 export async function logout() {
   if (!isBrowser()) return;
 
-  await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+  await fetch("/proxy/auth/logout", { method: "POST" }).catch(() => {});
 
   sessionStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(SESSION_KEY_PERSIST);

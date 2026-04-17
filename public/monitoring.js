@@ -129,7 +129,7 @@
 
     // fallback: imageUrl/imageBase64 bo'lmasa id orqali image endpoint
     if (!images.length && raw?.id != null) {
-      images.push(`/api/trashbins/${raw.id}/image`);
+      images.push(`/proxy/trashbins/${raw.id}/image`);
     }
 
     return [...new Set(images.filter(Boolean))];
@@ -152,7 +152,7 @@
     } catch (_) {}
 
     try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      await fetch("/proxy/auth/logout", { method: "POST", credentials: "include" });
     } catch (_) {}
 
     try {
@@ -311,7 +311,7 @@
   // ===== bins =====
   async function fetchTrashBinsFromApi() {
     try {
-      const res = await fetch("/api/trashbins?size=1000&page=0", {
+      const res = await fetch("/proxy/trashbins?size=1000&page=0", {
         cache: "no-store",
         credentials: "include",
         headers: getAuthHeaders(),

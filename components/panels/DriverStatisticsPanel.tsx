@@ -96,7 +96,7 @@ export default function DriverStatisticsPanel() {
     setErr(null);
 
     try {
-      const r = await apiFetch("/api/statistics/drivers", {
+      const r = await apiFetch("/proxy/statistics/drivers", {
         cache: "no-store",
       });
 

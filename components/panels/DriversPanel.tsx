@@ -83,7 +83,7 @@ export default function DriversPanel() {
     setErr("");
 
     try {
-      const res = await apiFetch("/api/drivers?page=0&size=1000", {
+      const res = await apiFetch("/proxy/drivers?page=0&size=1000", {
         cache: "no-store",
       });
 
@@ -144,7 +144,7 @@ export default function DriversPanel() {
     setErr("");
 
     try {
-      const res = await apiFetch("/api/drivers", {
+      const res = await apiFetch("/proxy/drivers", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -187,7 +187,7 @@ export default function DriversPanel() {
     setErr("");
 
     try {
-      const res = await apiFetch(`/api/drivers/${editing.id}`, {
+      const res = await apiFetch(`/proxy/drivers/${editing.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -214,7 +214,7 @@ export default function DriversPanel() {
     if (!canDelete) return;
 
     try {
-      const del = await apiFetch(`/api/drivers/${id}`, {
+      const del = await apiFetch(`/proxy/drivers/${id}`, {
         method: "DELETE",
       });
 

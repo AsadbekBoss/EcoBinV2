@@ -137,7 +137,7 @@ export default function StatsPanel() {
     try {
       if (reason === "manual") setLoading(true);
       setErr("");
-      const r = await apiFetch("/api/smartgps/stats", { cache: "no-store" });
+      const r = await apiFetch("/proxy/smartgps/stats", { cache: "no-store" });
       const j = await r.json();
       if (!r.ok || !j?.ok) throw new Error(j?.error || "API xato");
       const newCars: Car[] = j?.cars ?? [];
@@ -162,7 +162,7 @@ export default function StatsPanel() {
   async function loadViolations() {
     setVioLoading(true); setVioErr("");
     try {
-      const r = await apiFetch("/api/smartgps/violations", { cache: "no-store" });
+      const r = await apiFetch("/proxy/smartgps/violations", { cache: "no-store" });
       const j = await r.json();
       if (!j?.ok) throw new Error(j?.error || "Xato");
       setViolations(j.violations ?? []);
@@ -176,7 +176,7 @@ export default function StatsPanel() {
   async function loadToday() {
     setTodayLoading(true); setTodayErr("");
     try {
-      const r = await apiFetch("/api/smartgps/today", { cache: "no-store" });
+      const r = await apiFetch("/proxy/smartgps/today", { cache: "no-store" });
       const j = await r.json();
       if (!j?.ok) throw new Error(j?.error || "Xato");
       setTodayCars(j.cars ?? []);
@@ -191,7 +191,7 @@ export default function StatsPanel() {
     if (!unitId) return;
     setWeeklyLoading(true); setWeeklyErr(""); setWeeklyData(null); setExpandedDay(null);
     try {
-      const r = await apiFetch(`/api/smartgps/weekly?unitId=${unitId}`, { cache: "no-store" });
+      const r = await apiFetch(`/proxy/smartgps/weekly?unitId=${unitId}`, { cache: "no-store" });
       const j = await r.json();
       if (!j?.ok) throw new Error(j?.error || "Xato");
       setWeeklyData(j.days ?? []);
