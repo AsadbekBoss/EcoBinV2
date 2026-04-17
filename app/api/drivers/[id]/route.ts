@@ -24,7 +24,7 @@ export async function PUT(req: Request, ctx: Ctx) {
   const id = normalizeId(raw);
   if (!id) return bad(`ID noto’g’ri: ${String(raw)}`);
 
-  const token = await getTokenFromRequest(req);
+  const token = getTokenFromRequest(req);
   if (!token) {
     return authExpiredJson({ message: "Token topilmadi (monitor_token). Qayta login qiling." }, 401);
   }
@@ -67,7 +67,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const id = normalizeId(raw);
   if (!id) return bad(`ID noto’g’ri: ${String(raw)}`);
 
-  const token = await getTokenFromRequest(req);
+  const token = getTokenFromRequest(req);
   if (!token) {
     return authExpiredJson({ message: "Token topilmadi (monitor_token). Qayta login qiling." }, 401);
   }

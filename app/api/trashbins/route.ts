@@ -8,7 +8,7 @@ function getBase() {
 export async function GET(req: Request) {
   try {
     const base = getBase();
-    const token = await getTokenFromRequest(req);
+    const token = getTokenFromRequest(req);
 
     if (!token) {
       return authExpiredJson({ ok: false, message: "Token yo‘q. Login qiling." }, 401);
@@ -62,7 +62,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const base = getBase();
-    const token = await getTokenFromRequest(req);
+    const token = getTokenFromRequest(req);
 
     if (!token) {
       return authExpiredJson({ ok: false, message: "Token yo‘q. Login qiling." }, 401);

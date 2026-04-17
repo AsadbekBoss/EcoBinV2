@@ -5,7 +5,7 @@ export async function GET(req: Request) {
   try {
     const base = process.env.API_BASE || process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8082";
 
-    const token = await getTokenFromRequest(req);
+    const token = getTokenFromRequest(req);
 
     if (!token) {
       return authExpiredJson({ message: "Token topilmadi. Qayta login qiling." }, 401);

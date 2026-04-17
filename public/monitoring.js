@@ -324,12 +324,24 @@
         return null;
       }
 
-      if (!res.ok || !j?.ok) {
+      if (!res.ok) {
         console.error("Trashbins GET error:", res.status, j);
         return null;
       }
 
-      return Array.isArray(j.items) ? j.items : [];
+      // Handle both {ok: true, items: [...]} and raw backend {content: [...]} formats
+      const items =
+        Array.isArray(j?.items) ? j.items :
+        Array.isArray(j?.content) ? j.content :
+        Array.isArray(j) ? j :
+        null;
+
+      if (!items) {
+        console.error("Trashbins GET unexpected format:", j);
+        return null;
+      }
+
+      return items;
     } catch (e) {
       console.error("Trashbins fetch failed:", e);
       return null;

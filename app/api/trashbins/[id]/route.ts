@@ -12,7 +12,7 @@ export async function PUT(req: Request, ctx: Ctx) {
     const { id } = await ctx.params;
 
     const base = getBase();
-    const token = await getTokenFromRequest(req);
+    const token = getTokenFromRequest(req);
 
     if (!token) {
       return authExpiredJson({ ok: false, message: "Token yo‘q. Login qiling." }, 401);
@@ -59,7 +59,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
     const { id } = await ctx.params;
 
     const base = getBase();
-    const token = await getTokenFromRequest(req);
+    const token = getTokenFromRequest(req);
 
     if (!token) {
       return authExpiredJson({ ok: false, message: "Token yo‘q. Login qiling." }, 401);
