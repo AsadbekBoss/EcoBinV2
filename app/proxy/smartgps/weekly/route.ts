@@ -68,7 +68,7 @@ export async function GET(req: Request) {
       const from = to  - DAY;
       return {
         svc: "messages/load_interval",
-        params: { itemId: unitId, timeFrom: from, timeTo: to, flags: 1, flagsMask: 1, loadCount: 3000 },
+        params: { itemId: unitId, timeFrom: from, timeTo: to, flags: 1, flagsMask: 1, loadCount: 10000 },
       };
     });
 
