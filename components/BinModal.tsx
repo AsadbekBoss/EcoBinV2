@@ -52,33 +52,17 @@ export default function BinModal() {
           <div className="binInfoCol">
             <div className="binInfoGrid">
               <div className="binInfoCard">
-                <div className="l">Status</div>
-                <div className="v" id="mStatus">
-                  —
-                </div>
-              </div>
-
-              <div className="binInfoCard">
-                <div className="l">To‘lish</div>
-                <div className="v" id="mFill">
-                  —
-                </div>
-              </div>
-
-              <div className="binInfoCard">
-                <div className="l">Koordinata</div>
-                <div className="v" id="mCoord">
-                  —
-                </div>
-              </div>
-
-              <div className="binInfoCard">
                 <div className="l">Yangilangan</div>
                 <div className="v" id="mUpd">
                   —
                 </div>
               </div>
             </div>
+
+            {/* JS uchun yashirin elementlar */}
+            <span id="mStatus" style={{ display: "none" }} />
+            <span id="mFill" style={{ display: "none" }} />
+            <span id="mCoord" style={{ display: "none" }} />
 
             <div className="binActionRow">
               <button className="btn binBtn primary" id="mFocus" type="button">
