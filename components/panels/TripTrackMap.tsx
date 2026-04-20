@@ -49,7 +49,7 @@ export default function TripTrackMap({ unitId, from, to, tripNum, onClose }: Pro
       // Fetch track points
       let points: Pt[] = [];
       try {
-        const r = await apiFetch(`/api/smartgps/track?unitId=${unitId}&from=${from}&to=${to}`, { cache: "no-store" });
+        const r = await apiFetch(`/proxy/smartgps/track?unitId=${unitId}&from=${from}&to=${to}`, { cache: "no-store" });
         const j = await r.json();
         if (!r.ok || j.error) throw new Error(j.error || "API xato");
         points = j.points ?? [];

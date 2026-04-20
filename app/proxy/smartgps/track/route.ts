@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 
+let cachedSid: string | null = null;
+let sidExpiry = 0;
+const SID_TTL_MS = 20 * 60 * 1000;
+
 async function post(url: string, body: URLSearchParams) {
   const r = await fetch(url, {
     method: "POST",
@@ -9,6 +13,18 @@ async function post(url: string, body: URLSearchParams) {
   });
   const text = await r.text();
   try { return text ? JSON.parse(text) : null; } catch { return null; }
+}
+
+async function getOrRefreshSid(base: string, token: string): Promise<string | null> {
+  if (cachedSid && Date.now() < sidExpiry) return cachedSid;
+  const lb = new URLSearchParams();
+  lb.set("params", JSON.stringify({ token }));
+  const login = await post(`${base}/wialon/ajax.html?svc=token/login`, lb);
+  const sid = login?.eid || login?.sid;
+  if (!sid || login?.error) { cachedSid = null; sidExpiry = 0; return null; }
+  cachedSid = sid;
+  sidExpiry = Date.now() + SID_TTL_MS;
+  return sid;
 }
 
 export async function GET(req: Request) {
@@ -24,12 +40,8 @@ export async function GET(req: Request) {
     const base  = process.env.SMARTGPS_BASE!;
     const token = process.env.SMARTGPS_TOKEN!;
 
-    // Login
-    const lb = new URLSearchParams();
-    lb.set("params", JSON.stringify({ token }));
-    const login = await post(`${base}/wialon/ajax.html?svc=token/login`, lb);
-    const sid = login?.eid || login?.sid;
-    if (!sid) return NextResponse.json({ error: "Login failed" }, { status: 401 });
+    const sid = await getOrRefreshSid(base, token);
+    if (!sid) return NextResponse.json({ error: "SmartGPS login failed" }, { status: 401 });
 
     // Load messages for the given time range
     const mb = new URLSearchParams();
