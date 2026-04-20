@@ -16,12 +16,11 @@ interface Props {
 
 interface Pt { lat: number; lng: number; speed: number; time: number | null; }
 
-/* Speed → colour */
 function speedColor(s: number): string {
-  if (s < 30)  return "#22c55e";   // green  – slow
-  if (s < 60)  return "#f59e0b";   // amber  – normal
-  if (s < 90)  return "#f97316";   // orange – fast
-  return         "#ef4444";        // red    – overspeed
+  if (s < 30)  return "#22c55e";
+  if (s < 60)  return "#f59e0b";
+  if (s < 90)  return "#f97316";
+  return         "#ef4444";
 }
 
 export default function TripTrackMap({ unitId, from, to, tripNum, preloadedPoints, onClose }: Props) {
@@ -38,29 +37,17 @@ export default function TripTrackMap({ unitId, from, to, tripNum, preloadedPoint
       setLoading(true);
       setErr("");
 
-      // Leaflet yuklanmagan bo'lsa dinamik yuklash
-      if (typeof (window as any).L === "undefined") {
-        await new Promise<void>((resolve, reject) => {
-          const existing = document.querySelector('script[src*="leaflet"]');
-          if (existing) { resolve(); return; }
-          const s = document.createElement("script");
-          s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-          s.onload = () => resolve();
-          s.onerror = () => reject(new Error("Leaflet CDN yuklanmadi"));
-          document.head.appendChild(s);
-        });
-      }
-      // CSS ham kerak bo'lsa qo'shish
+      // Dynamic import to avoid SSR issues
+      const L = (await import("leaflet")).default;
+
+      // Inject Leaflet CSS if not already present
       if (!document.querySelector('link[href*="leaflet"]')) {
         const link = document.createElement("link");
         link.rel = "stylesheet";
         link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
         document.head.appendChild(link);
       }
-      const L = (window as any).L;
-      if (!L) { setErr("Leaflet yuklanmadi"); setLoading(false); return; }
 
-      // GPS nuqtalar — avval weekly'dan kelgan nuqtalarni ishlatamiz
       let points: Pt[] = [];
       if (preloadedPoints && preloadedPoints.length > 0) {
         points = preloadedPoints;
@@ -85,10 +72,8 @@ export default function TripTrackMap({ unitId, from, to, tripNum, preloadedPoint
         return;
       }
 
-      // Build map
       if (!mapDivRef.current) return;
 
-      // Destroy previous instance
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -101,24 +86,21 @@ export default function TripTrackMap({ unitId, from, to, tripNum, preloadedPoint
         maxZoom: 19,
       }).addTo(map);
 
-      // Draw coloured polyline segments
       for (let i = 1; i < points.length; i++) {
         const a = points[i - 1];
         const b = points[i];
         L.polyline([[a.lat, a.lng], [b.lat, b.lng]], {
-          color:  speedColor(b.speed),
-          weight: 4,
+          color:   speedColor(b.speed),
+          weight:  4,
           opacity: 0.85,
         }).addTo(map);
       }
 
-      // Start marker (green)
       const startIcon = L.divIcon({
         className: "",
         html: `<div style="width:14px;height:14px;border-radius:50%;background:#22c55e;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)"></div>`,
         iconAnchor: [7, 7],
       });
-      // End marker (red)
       const endIcon = L.divIcon({
         className: "",
         html: `<div style="width:14px;height:14px;border-radius:50%;background:#ef4444;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)"></div>`,
@@ -127,16 +109,12 @@ export default function TripTrackMap({ unitId, from, to, tripNum, preloadedPoint
 
       const first = points[0];
       const last  = points[points.length - 1];
-      L.marker([first.lat, first.lng], { icon: startIcon })
-        .bindPopup("Boshlanish").addTo(map);
-      L.marker([last.lat,  last.lng],  { icon: endIcon })
-        .bindPopup("Tugash").addTo(map);
+      L.marker([first.lat, first.lng], { icon: startIcon }).bindPopup("Boshlanish").addTo(map);
+      L.marker([last.lat,  last.lng],  { icon: endIcon   }).bindPopup("Tugash").addTo(map);
 
-      // Fit bounds
       const latlngs = points.map(p => [p.lat, p.lng] as [number, number]);
       map.fitBounds(L.latLngBounds(latlngs), { padding: [24, 24] });
 
-      // Calc rough stats
       let km = 0;
       let maxSpd = 0;
       for (let i = 1; i < points.length; i++) {
@@ -170,7 +148,6 @@ export default function TripTrackMap({ unitId, from, to, tripNum, preloadedPoint
   return (
     <div className={S.overlay}>
       <div className={S.panel}>
-        {/* Header */}
         <div className={S.hdr}>
           <span className={S.title}>Sayohat #{tripNum} — marshrut</span>
           {stats && (
@@ -183,7 +160,6 @@ export default function TripTrackMap({ unitId, from, to, tripNum, preloadedPoint
           <button className={S.closeBtn} onClick={onClose} aria-label="Yopish">✕</button>
         </div>
 
-        {/* Legend */}
         <div className={S.legend}>
           <span className={S.lgItem}><span className={S.lgDot} style={{background:"#22c55e"}}/>&lt;30</span>
           <span className={S.lgItem}><span className={S.lgDot} style={{background:"#f59e0b"}}/>&lt;60</span>
@@ -194,7 +170,6 @@ export default function TripTrackMap({ unitId, from, to, tripNum, preloadedPoint
           <span className={S.lgItem}><span className={S.lgDotCircle} style={{background:"#ef4444"}}/>Finish</span>
         </div>
 
-        {/* Map area */}
         <div className={S.mapWrap}>
           {loading && (
             <div className={S.mapOverlay}>
