@@ -37,11 +37,24 @@ export default function TripTrackMap({ unitId, from, to, tripNum, onClose }: Pro
       setLoading(true);
       setErr("");
 
-      // Wait for window.L (Leaflet CDN)
-      let tries = 0;
-      while (typeof (window as any).L === "undefined" && tries < 30) {
-        await new Promise(r => setTimeout(r, 200));
-        tries++;
+      // Leaflet yuklanmagan bo'lsa dinamik yuklash
+      if (typeof (window as any).L === "undefined") {
+        await new Promise<void>((resolve, reject) => {
+          const existing = document.querySelector('script[src*="leaflet"]');
+          if (existing) { resolve(); return; }
+          const s = document.createElement("script");
+          s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error("Leaflet CDN yuklanmadi"));
+          document.head.appendChild(s);
+        });
+      }
+      // CSS ham kerak bo'lsa qo'shish
+      if (!document.querySelector('link[href*="leaflet"]')) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
       }
       const L = (window as any).L;
       if (!L) { setErr("Leaflet yuklanmadi"); setLoading(false); return; }
