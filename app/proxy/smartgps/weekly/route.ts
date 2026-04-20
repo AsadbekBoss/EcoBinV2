@@ -1,6 +1,32 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 
+// SID keshi — har safar qayta login qilmaslik uchun
+let cachedSid: string | null = null;
+let sidExpiry = 0;
+const SID_TTL_MS = 20 * 60 * 1000;
+
+async function getOrRefreshSid(base: string, token: string): Promise<string | null> {
+  if (cachedSid && Date.now() < sidExpiry) return cachedSid;
+
+  const body = new URLSearchParams();
+  body.set("params", JSON.stringify({ token }));
+  const r = await fetch(`${base}/wialon/ajax.html?svc=token/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const text = await r.text();
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { return null; }
+
+  const sid = data?.eid || data?.sid;
+  if (!sid || data?.error) { cachedSid = null; sidExpiry = 0; return null; }
+  cachedSid = sid;
+  sidExpiry = Date.now() + SID_TTL_MS;
+  return sid;
+}
+
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -30,12 +56,8 @@ export async function GET(req: Request) {
     const base  = process.env.SMARTGPS_BASE!;
     const token = process.env.SMARTGPS_TOKEN!;
 
-    // Login
-    const loginBody = new URLSearchParams();
-    loginBody.set("params", JSON.stringify({ token }));
-    const login = await post(`${base}/wialon/ajax.html?svc=token/login`, loginBody);
-    const sid = login?.eid || login?.sid;
-    if (!sid) return NextResponse.json({ ok: false, error: "Login failed" }, { status: 401 });
+    let sid = await getOrRefreshSid(base, token);
+    if (!sid) return NextResponse.json({ ok: false, error: "SmartGPS login failed" }, { status: 401 });
 
     const now = Math.floor(Date.now() / 1000);
     const DAY = 86400;
@@ -46,14 +68,26 @@ export async function GET(req: Request) {
       const from = to  - DAY;
       return {
         svc: "messages/load_interval",
-        params: { itemId: unitId, timeFrom: from, timeTo: to, flags: 1, flagsMask: 1, loadCount: 10000 },
+        params: { itemId: unitId, timeFrom: from, timeTo: to, flags: 1, flagsMask: 1, loadCount: 3000 },
       };
     });
 
-    const batchBody = new URLSearchParams();
+    let batchBody = new URLSearchParams();
     batchBody.set("sid", sid);
     batchBody.set("params", JSON.stringify(batchItems));
-    const batchData = await post(`${base}/wialon/ajax.html?svc=core/batch`, batchBody);
+    let batchData = await post(`${base}/wialon/ajax.html?svc=core/batch`, batchBody);
+
+    // SID eskirgan bo'lsa qayta login
+    if (batchData?.error === 1 || batchData?.error === 4) {
+      cachedSid = null; sidExpiry = 0;
+      sid = await getOrRefreshSid(base, token);
+      if (!sid) return NextResponse.json({ ok: false, error: "SmartGPS re-login failed" }, { status: 401 });
+      batchBody = new URLSearchParams();
+      batchBody.set("sid", sid);
+      batchBody.set("params", JSON.stringify(batchItems));
+      batchData = await post(`${base}/wialon/ajax.html?svc=core/batch`, batchBody);
+    }
+
     const results: any[] = Array.isArray(batchData) ? batchData : [];
 
     const TRIP_GAP = 300; // 5 daqiqa to'xtash → yangi trip
