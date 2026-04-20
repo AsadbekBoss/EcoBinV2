@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { authExpiredJson, getTokenFromRequest, isAuthStatus } from "@/lib/server/monitorAuth";
 
