@@ -63,9 +63,10 @@ export default function TripTrackMap({ unitId, from, to, tripNum, onClose }: Pro
       let points: Pt[] = [];
       try {
         const r = await apiFetch(`/proxy/smartgps/track?unitId=${unitId}&from=${from}&to=${to}`, { cache: "no-store" });
-        const j = await r.json();
-        if (!r.ok || j.error) throw new Error(j.error || "API xato");
-        points = j.points ?? [];
+        const j = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(j?.error || j?.message || `HTTP ${r.status}`);
+        if (j?.error) throw new Error(j.error);
+        points = j?.points ?? [];
       } catch (e: any) {
         if (!cancelled) { setErr(e.message || "Xatolik"); setLoading(false); }
         return;

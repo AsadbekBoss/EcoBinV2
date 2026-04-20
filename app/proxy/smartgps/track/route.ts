@@ -50,7 +50,18 @@ export async function GET(req: Request) {
       itemId: unitId, timeFrom: from, timeTo: to,
       flags: 1, flagsMask: 1, loadCount: 5000,
     }));
-    const data = await post(`${base}/wialon/ajax.html?svc=messages/load_interval`, mb);
+    let data = await post(`${base}/wialon/ajax.html?svc=messages/load_interval`, mb);
+
+    // SID eskirgan bo'lsa retry
+    if (data?.error === 1 || data?.error === 4) {
+      cachedSid = null; sidExpiry = 0;
+      const newSid = await getOrRefreshSid(base, token);
+      if (newSid) {
+        mb.set("sid", newSid);
+        data = await post(`${base}/wialon/ajax.html?svc=messages/load_interval`, mb);
+      }
+    }
+
     const msgs: any[] = data?.messages || [];
 
     const points = msgs
