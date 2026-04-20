@@ -21,6 +21,17 @@
   const fmtTime = (d = new Date()) =>
     d.toLocaleString("uz-UZ", { hour12: false });
 
+  function fmtDuration(ms) {
+    if (ms < 0) ms = 0;
+    const totalMin = Math.floor(ms / 60000);
+    const days = Math.floor(totalMin / 1440);
+    const hours = Math.floor((totalMin % 1440) / 60);
+    const mins = totalMin % 60;
+    if (days > 0) return `${days} kun ${hours} soat`;
+    if (hours > 0) return `${hours} soat ${mins} daqiqa`;
+    return `${mins} daqiqa`;
+  }
+
   const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
   const rand = (min, max) => min + Math.random() * (max - min);
 
@@ -187,6 +198,7 @@
     mFill,
     mCoord,
     mUpd,
+    mCleanDuration,
     cleanBtn;
   let mMainImg, mThumbs, mBadgeStatus, mBadgeFill;
 
@@ -662,6 +674,14 @@
     if (mFill) mFill.textContent = `${b.fill}%`;
     if (mCoord) mCoord.textContent = `${b.lat.toFixed(6)}, ${b.lng.toFixed(6)}`;
     if (mUpd) mUpd.textContent = fmtTime(b.updatedAt);
+    if (mCleanDuration) {
+      if (b.status === "green") {
+        const elapsed = Date.now() - b.updatedAt.getTime();
+        mCleanDuration.textContent = fmtDuration(elapsed) + " davomida toza";
+      } else {
+        mCleanDuration.textContent = "Hozir to'la";
+      }
+    }
 
     const carsList = getCarsSafe();
     const near = b.status === "red" ? nearestCarToBin(b) : null;
@@ -913,6 +933,7 @@
       mFill = document.getElementById("mFill");
       mCoord = document.getElementById("mCoord");
       mUpd = document.getElementById("mUpd");
+      mCleanDuration = document.getElementById("mCleanDuration");
       cleanBtn = document.getElementById("cleanBtn");
 
       mMainImg = document.getElementById("mMainImg");

@@ -71,6 +71,13 @@ export default function BinModal() {
                   —
                 </div>
               </div>
+
+              <div className="binInfoCard">
+                <div className="l">Tozalik davomiyligi</div>
+                <div className="v" id="mCleanDuration">
+                  —
+                </div>
+              </div>
             </div>
 
             {/* Koordinata JS uchun yashirin */}
