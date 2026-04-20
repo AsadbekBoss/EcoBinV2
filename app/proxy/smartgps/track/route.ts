@@ -48,21 +48,28 @@ export async function GET(req: Request) {
     mb.set("sid", sid);
     mb.set("params", JSON.stringify({
       itemId: unitId, timeFrom: from, timeTo: to,
-      flags: 1, flagsMask: 1, loadCount: 5000,
+      flags: 0xff, flagsMask: 0, loadCount: 5000,
     }));
     const data = await post(`${base}/wialon/ajax.html?svc=messages/load_interval`, mb);
     const msgs: any[] = data?.messages || [];
 
     const points = msgs
-      .filter((m: any) => m?.pos)
-      .map((m: any) => ({
-        lat:   m.pos.y,
-        lng:   m.pos.x,
-        speed: Number(m.pos.s ?? 0),
-        time:  m.t ?? null,
-      }));
+      .filter((m: any) => m?.pos || m?.p)
+      .map((m: any) => {
+        const p = m.pos || m.p;
+        return {
+          lat:   p.y,
+          lng:   p.x,
+          speed: Number(p.s ?? 0),
+          time:  m.t ?? null,
+        };
+      });
 
-    return NextResponse.json({ ok: true, points });
+    return NextResponse.json({
+      ok: true,
+      points,
+      _debug: { totalMsgs: msgs.length, withPos: points.length, from, to, unitId },
+    });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
