@@ -43,9 +43,11 @@ type TodayCar = {
   maxSpeed: number; idleMin: number;
   tripList: Trip[];
 };
+type TripPoint = { lat: number; lng: number; speed: number; time: number | null };
 type Trip = {
   n: number; startTime: number; endTime: number;
   km: number; avgSpeed: number; maxSpeed: number; durationMin: number;
+  points?: TripPoint[];
 };
 type WeekDay = {
   date: string; isToday: boolean;
@@ -128,7 +130,7 @@ export default function StatsPanel() {
   const [weeklyLoading, setWeeklyLoading] = useState(false);
   const [weeklyErr,     setWeeklyErr]     = useState("");
   const [expandedDay,   setExpandedDay]   = useState<number | null>(null);
-  const [mapTrip,       setMapTrip]       = useState<{ unitId: number; from: number; to: number; n: number } | null>(null);
+  const [mapTrip,       setMapTrip]       = useState<{ unitId: number; from: number; to: number; n: number; points?: TripPoint[] } | null>(null);
 
   const rRef = useRef<any>(null);
 
@@ -860,6 +862,7 @@ export default function StatsPanel() {
                             from:   t.startTime,
                             to:     t.endTime,
                             n:      t.n,
+                            points: t.points,
                           })}
                           title="Xaritada ko'rish"
                         >
@@ -895,6 +898,7 @@ export default function StatsPanel() {
         from={mapTrip.from}
         to={mapTrip.to}
         tripNum={mapTrip.n}
+        preloadedPoints={mapTrip.points}
         onClose={() => setMapTrip(null)}
       />
     )}

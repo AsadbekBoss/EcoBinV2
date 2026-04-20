@@ -125,6 +125,7 @@ export async function GET(req: Request) {
               n: tripList.length + 1,
               startTime: m.t, endTime: m.t,
               km: 0, speedSum: spd, cnt: 1, maxSpeed: spd,
+              pts: [],
             };
           }
           wasStopped = false;
@@ -132,7 +133,6 @@ export async function GET(req: Request) {
         } else if (!moving && !wasStopped) {
           wasStopped   = true;
           lastStopTime = m.t ?? null;
-          if (cur) { idleSec += 0; } // idle counted separately
         }
 
         if (cur && moving) {
@@ -140,6 +140,7 @@ export async function GET(req: Request) {
           cur.speedSum += spd; cur.cnt++;
           if (spd > cur.maxSpeed) cur.maxSpeed = spd;
           if (pp) { const d = haversineKm(pp.y, pp.x, p.y, p.x); if (d < 1) cur.km += d; }
+          cur.pts.push({ lat: p.y, lng: p.x, speed: spd, time: m.t ?? null });
         }
       }
       if (cur) tripList.push(cur);
@@ -154,15 +155,22 @@ export async function GET(req: Request) {
         trips:    tripList.length,
         idleMin:  Math.round(idleSec / 60),
         maxSpeed: Math.round(maxSpeed),
-        tripList: tripList.map(t => ({
-          n:           t.n,
-          startTime:   t.startTime,
-          endTime:     t.endTime,
-          km:          Math.round(t.km * 10) / 10,
-          avgSpeed:    t.cnt > 0 ? Math.round(t.speedSum / t.cnt) : 0,
-          maxSpeed:    Math.round(t.maxSpeed),
-          durationMin: t.startTime && t.endTime ? Math.round((t.endTime - t.startTime) / 60) : 0,
-        })),
+        tripList: tripList.map(t => {
+          // Max 300 nuqta — downsampling
+          const pts: any[] = t.pts || [];
+          const step = pts.length > 300 ? Math.ceil(pts.length / 300) : 1;
+          const points = pts.filter((_: any, i: number) => i % step === 0);
+          return {
+            n:           t.n,
+            startTime:   t.startTime,
+            endTime:     t.endTime,
+            km:          Math.round(t.km * 10) / 10,
+            avgSpeed:    t.cnt > 0 ? Math.round(t.speedSum / t.cnt) : 0,
+            maxSpeed:    Math.round(t.maxSpeed),
+            durationMin: t.startTime && t.endTime ? Math.round((t.endTime - t.startTime) / 60) : 0,
+            points,
+          };
+        }),
       };
     }).reverse();
 

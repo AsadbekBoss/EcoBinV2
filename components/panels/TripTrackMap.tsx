@@ -7,9 +7,10 @@ import S from "./TripTrackMap.module.css";
 
 interface Props {
   unitId: number;
-  from: number;   // unix seconds
-  to: number;     // unix seconds
+  from: number;
+  to: number;
   tripNum: number;
+  preloadedPoints?: Pt[];
   onClose: () => void;
 }
 
@@ -23,7 +24,7 @@ function speedColor(s: number): string {
   return         "#ef4444";        // red    – overspeed
 }
 
-export default function TripTrackMap({ unitId, from, to, tripNum, onClose }: Props) {
+export default function TripTrackMap({ unitId, from, to, tripNum, preloadedPoints, onClose }: Props) {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef    = useRef<any>(null);
   const [loading, setLoading] = useState(true);
@@ -59,17 +60,21 @@ export default function TripTrackMap({ unitId, from, to, tripNum, onClose }: Pro
       const L = (window as any).L;
       if (!L) { setErr("Leaflet yuklanmadi"); setLoading(false); return; }
 
-      // Fetch track points
+      // GPS nuqtalar — avval weekly'dan kelgan nuqtalarni ishlatamiz
       let points: Pt[] = [];
-      try {
-        const r = await apiFetch(`/proxy/smartgps/track?unitId=${unitId}&from=${from}&to=${to}`, { cache: "no-store" });
-        const j = await r.json().catch(() => null);
-        if (!r.ok) throw new Error(j?.error || j?.message || `HTTP ${r.status}`);
-        if (j?.error) throw new Error(j.error);
-        points = j?.points ?? [];
-      } catch (e: any) {
-        if (!cancelled) { setErr(e.message || "Xatolik"); setLoading(false); }
-        return;
+      if (preloadedPoints && preloadedPoints.length > 0) {
+        points = preloadedPoints;
+      } else {
+        try {
+          const r = await apiFetch(`/proxy/smartgps/track?unitId=${unitId}&from=${from}&to=${to}`, { cache: "no-store" });
+          const j = await r.json().catch(() => null);
+          if (!r.ok) throw new Error(j?.error || j?.message || `HTTP ${r.status}`);
+          if (j?.error) throw new Error(j.error);
+          points = j?.points ?? [];
+        } catch (e: any) {
+          if (!cancelled) { setErr(e.message || "Xatolik"); setLoading(false); }
+          return;
+        }
       }
 
       if (cancelled) return;
