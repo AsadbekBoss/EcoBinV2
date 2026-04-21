@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -40,6 +41,7 @@ type FormState = {
   longitude: string;
   fillLevel: string;
   cameraId: string;
+  binCount: string;
   driverIds: string[];
 };
 
@@ -83,6 +85,7 @@ const EMPTY_FORM: FormState = {
   longitude: "",
   fillLevel: "0",
   cameraId: "",
+  binCount: "",
   driverIds: [],
 };
 
@@ -103,23 +106,21 @@ export default function TrashbinsPanel() {
   const [editing, setEditing] = useState<Trashbin | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
+  // Driver picker sub-modal
+  const [driverPickerOpen, setDriverPickerOpen] = useState(false);
+  const [driverSearch, setDriverSearch] = useState("");
+
   async function loadBins() {
     setLoading(true);
     setErr(null);
-
     try {
-      const r = await apiFetch("/proxy/trashbins?page=0&size=1000", {
-        cache: "no-store",
-      });
-
+      const r = await apiFetch("/proxy/trashbins?page=0&size=1000", { cache: "no-store" });
       const j = await r.json().catch(() => ({}));
-
       if (!r.ok) {
         setErr((j as any)?.message || (j as any)?.error || `Trashbins error: ${r.status}`);
         setBins([]);
         return;
       }
-
       setBins(pickList(j) as Trashbin[]);
     } catch (e: any) {
       setErr(e?.message || "Network error");
@@ -131,77 +132,46 @@ export default function TrashbinsPanel() {
 
   async function loadDriversMaybe() {
     setDriversErr(null);
-
     try {
       const r = await apiFetch("/proxy/users/drivers", { cache: "no-store" });
       const j = await r.json().catch(() => ({}));
-
       if (!r.ok) {
         setDrivers([]);
         setDriversErr((j as any)?.message || (j as any)?.error || `Drivers error: ${r.status}`);
         return;
       }
-
       const list = pickList(j) as Driver[];
-      const onlyDrivers = list.filter((u) => {
-        const role = normalizeRole(u?.role);
-        return role === "DRIVER" || !role;
-      });
-
-      setDrivers(onlyDrivers);
+      setDrivers(list.filter((u) => { const role = normalizeRole(u?.role); return role === "DRIVER" || !role; }));
     } catch (e: any) {
       setDrivers([]);
       setDriversErr(e?.message || "Drivers list load error");
     }
   }
 
-  useEffect(() => {
-    loadBins();
-    loadDriversMaybe();
-  }, []);
+  useEffect(() => { loadBins(); loadDriversMaybe(); }, []);
 
   useEffect(() => {
     if (!open) return;
-
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = prev;
-    };
+    return () => { document.body.style.overflow = prev; };
   }, [open]);
 
   const stats = useMemo(() => {
     const total = bins.length;
-    const full = bins.filter(
-      (b) => String(b?.status || "") === "FULL" || num(b.fillLevel) >= 90
-    ).length;
-    const empty = total - full;
-    return { total, full, empty };
+    const full = bins.filter((b) => String(b?.status || "") === "FULL" || num(b.fillLevel) >= 90).length;
+    return { total, full, empty: total - full };
   }, [bins]);
 
   const filteredBins = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return bins;
-
     return bins.filter((b) => {
       const driverNames = Array.isArray(b.drivers)
-        ? b.drivers
-            .map((d) => d.fullname || d.fullName || d.username || "")
-            .join(" ")
+        ? b.drivers.map((d) => d.fullname || d.fullName || d.username || "").join(" ")
         : "";
-
-      return [
-        String(b.id ?? ""),
-        String(b.name ?? ""),
-        String(b.cameraId ?? ""),
-        String(b.status ?? ""),
-        String(b.fillLevel ?? ""),
-        driverNames,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(s);
+      return [String(b.id ?? ""), String(b.name ?? ""), String(b.cameraId ?? ""), String(b.status ?? ""), String(b.fillLevel ?? ""), driverNames]
+        .join(" ").toLowerCase().includes(s);
     });
   }, [bins, q]);
 
@@ -214,53 +184,40 @@ export default function TrashbinsPanel() {
     return filteredBins.slice(start, start + PAGE_SIZE);
   }, [filteredBins, currentPage]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [q]);
+  useEffect(() => { setPage(1); }, [q]);
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
 
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
-
-  function resetForm() {
-    setForm(EMPTY_FORM);
-  }
+  function resetForm() { setForm(EMPTY_FORM); }
 
   function closeModal() {
     if (saving) return;
     setOpen(false);
     setEditing(null);
     resetForm();
+    setDriverPickerOpen(false);
+    setDriverSearch("");
   }
 
   function openCreate() {
-    setErr(null);
-    setOkMsg(null);
-    setEditing(null);
-    resetForm();
-    setOpen(true);
+    setErr(null); setOkMsg(null); setEditing(null);
+    resetForm(); setOpen(true);
   }
 
   function openEdit(b: Trashbin) {
-    setErr(null);
-    setOkMsg(null);
-    setEditing(b);
-
+    setErr(null); setOkMsg(null); setEditing(b);
     setForm({
       name: b.name ?? "",
       latitude: String(b.latitude ?? ""),
       longitude: String(b.longitude ?? ""),
       fillLevel: String(b.fillLevel ?? "0"),
       cameraId: String(b.cameraId ?? ""),
+      binCount: "",
       driverIds: Array.isArray(b.drivers) ? b.drivers.map((d) => String(d.id)) : [],
     });
-
     setOpen(true);
   }
 
-  function toggleDriverForForm(id: string) {
+  function toggleDriver(id: string) {
     setForm((prev) => ({
       ...prev,
       driverIds: prev.driverIds.includes(id)
@@ -269,13 +226,13 @@ export default function TrashbinsPanel() {
     }));
   }
 
+  function removeDriver(id: string) {
+    setForm((prev) => ({ ...prev, driverIds: prev.driverIds.filter((x) => x !== id) }));
+  }
+
   function buildCreatePayload(): TrashbinPayload {
-    const driverIds = form.driverIds
-      .map((id) => Number(id))
-      .filter((id) => Number.isFinite(id) && id > 0);
-
+    const driverIds = form.driverIds.map(Number).filter((id) => Number.isFinite(id) && id > 0);
     const fillLevel = num(form.fillLevel, NaN);
-
     return {
       name: form.name.trim(),
       latitude: num(form.latitude, NaN),
@@ -289,13 +246,8 @@ export default function TrashbinsPanel() {
 
   function buildEditPayload(): TrashbinPayload | null {
     if (!editing) return null;
-
-    const driverIds = form.driverIds
-      .map((id) => Number(id))
-      .filter((id) => Number.isFinite(id) && id > 0);
-
+    const driverIds = form.driverIds.map(Number).filter((id) => Number.isFinite(id) && id > 0);
     const fillLevel = num(form.fillLevel, NaN);
-
     return {
       name: editing.name,
       latitude: Number(editing.latitude),
@@ -307,162 +259,91 @@ export default function TrashbinsPanel() {
     };
   }
 
-  function validateCreatePayload(payload: TrashbinPayload) {
-    if (!payload.name) return "Name kiriting";
-
-    if (!Number.isFinite(payload.latitude) || !Number.isFinite(payload.longitude)) {
-      return "Latitude/Longitude noto‘g‘ri";
-    }
-
-    if (
-      !Number.isFinite(payload.fillLevel) ||
-      payload.fillLevel < 0 ||
-      payload.fillLevel > 100
-    ) {
-      return "Fill Level 0 dan 100 gacha bo‘lishi kerak";
-    }
-
-    if (!payload.cameraId) return "Camera ID kiriting";
-    if (!payload.driverIds.length) return "Kamida bitta driver tanlang";
-
+  function validateCreate(p: TrashbinPayload) {
+    if (!p.name) return "Name kiriting";
+    if (!Number.isFinite(p.latitude) || !Number.isFinite(p.longitude)) return "Latitude/Longitude noto'g'ri";
+    if (!Number.isFinite(p.fillLevel) || p.fillLevel < 0 || p.fillLevel > 100) return "Fill Level 0–100 bo'lishi kerak";
+    if (!p.cameraId) return "Camera ID kiriting";
+    if (!p.driverIds.length) return "Kamida bitta haydovchi tanlang";
     return null;
   }
 
-  function validateEditPayload(payload: TrashbinPayload) {
-    if (
-      !Number.isFinite(payload.fillLevel) ||
-      payload.fillLevel < 0 ||
-      payload.fillLevel > 100
-    ) {
-      return "Fill Level 0 dan 100 gacha bo‘lishi kerak";
-    }
-
-    if (!payload.driverIds.length) return "Kamida bitta driver tanlang";
-
+  function validateEdit(p: TrashbinPayload) {
+    if (!Number.isFinite(p.fillLevel) || p.fillLevel < 0 || p.fillLevel > 100) return "Fill Level 0–100 bo'lishi kerak";
+    if (!p.driverIds.length) return "Kamida bitta haydovchi tanlang";
     return null;
   }
 
   async function createBin() {
     if (saving) return;
-
-    setSaving(true);
-    setErr(null);
-    setOkMsg(null);
-
+    setSaving(true); setErr(null); setOkMsg(null);
     const payload = buildCreatePayload();
-    const validationError = validateCreatePayload(payload);
-
-    if (validationError) {
-      setErr(validationError);
-      setSaving(false);
-      return;
-    }
-
+    const ve = validateCreate(payload);
+    if (ve) { setErr(ve); setSaving(false); return; }
     try {
-      const r = await apiFetch("/proxy/trashbins", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
+      const r = await apiFetch("/proxy/trashbins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await r.json().catch(() => ({}));
-
-      if (!r.ok) {
-        setErr((j as any)?.message || (j as any)?.error || `Create error: ${r.status}`);
-        return;
-      }
-
+      if (!r.ok) { setErr((j as any)?.message || (j as any)?.error || `Create error: ${r.status}`); return; }
       setOkMsg("✅ Trashbin yaratildi");
-      closeModal();
-      await loadBins();
+      closeModal(); await loadBins();
     } catch (e: any) {
       setErr(e?.message || "Network error");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }
 
   async function updateBin() {
     if (!editing || saving) return;
-
-    setSaving(true);
-    setErr(null);
-    setOkMsg(null);
-
+    setSaving(true); setErr(null); setOkMsg(null);
     const payload = buildEditPayload();
-    if (!payload) {
-      setErr("Edit ma’lumoti topilmadi");
-      setSaving(false);
-      return;
-    }
-
-    const validationError = validateEditPayload(payload);
-
-    if (validationError) {
-      setErr(validationError);
-      setSaving(false);
-      return;
-    }
-
+    if (!payload) { setErr("Edit ma'lumoti topilmadi"); setSaving(false); return; }
+    const ve = validateEdit(payload);
+    if (ve) { setErr(ve); setSaving(false); return; }
     try {
-      const r = await apiFetch(`/proxy/trashbins/${editing.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
+      const r = await apiFetch(`/proxy/trashbins/${editing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const j = await r.json().catch(() => ({}));
-
-      if (!r.ok) {
-        setErr((j as any)?.message || (j as any)?.error || `Update error: ${r.status}`);
-        return;
-      }
-
+      if (!r.ok) { setErr((j as any)?.message || (j as any)?.error || `Update error: ${r.status}`); return; }
       setOkMsg("✅ Trashbin yangilandi");
-      closeModal();
-      await loadBins();
+      closeModal(); await loadBins();
     } catch (e: any) {
       setErr(e?.message || "Network error");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }
 
   async function deleteBin(id: number) {
-    const yes = confirm(`Trashbin #${id} ni o‘chirasanmi?`);
-    if (!yes) return;
-
-    setErr(null);
-    setOkMsg(null);
-
+    if (!confirm(`Trashbin #${id} ni o'chirasanmi?`)) return;
+    setErr(null); setOkMsg(null);
     try {
       const r = await apiFetch(`/proxy/trashbins/${id}`, { method: "DELETE" });
       const j = await r.json().catch(() => ({}));
-
-      if (!r.ok) {
-        setErr((j as any)?.message || (j as any)?.error || `Delete error: ${r.status}`);
-        return;
-      }
-
-      setOkMsg("🗑️ Trashbin o‘chirildi");
-      await loadBins();
-    } catch (e: any) {
-      setErr(e?.message || "Network error");
-    }
+      if (!r.ok) { setErr((j as any)?.message || (j as any)?.error || `Delete error: ${r.status}`); return; }
+      setOkMsg("🗑️ Trashbin o'chirildi"); await loadBins();
+    } catch (e: any) { setErr(e?.message || "Network error"); }
   }
 
-  function getDriverDisplayName(driver: DriverShort) {
-    return driver.fullname || driver.fullName || driver.username || `#${driver.id}`;
+  function driverName(d: DriverShort | Driver) {
+    return (d as any).fullname || (d as any).fullName || d.username || `#${d.id}`;
   }
+
+  const selectedDriverObjs = useMemo(
+    () => drivers.filter((d) => form.driverIds.includes(String(d.id))),
+    [drivers, form.driverIds]
+  );
+
+  const filteredDrivers = useMemo(() => {
+    const s = driverSearch.trim().toLowerCase();
+    if (!s) return drivers;
+    return drivers.filter((d) =>
+      `${driverName(d)} ${d.username}`.toLowerCase().includes(s)
+    );
+  }, [drivers, driverSearch]);
 
   return (
     <div className={Style.wrap}>
       <div className={Style.headRow}>
         <div>
           <div className={Style.hTitle}>🗑️ Trashbins</div>
-          <div className={Style.hSub}>Yaratish / ko‘rish / nazorat</div>
+          <div className={Style.hSub}>Yaratish / ko'rish / nazorat</div>
         </div>
-
         <div className={Style.headActions}>
           <input
             className={`${Style.input} ${Style.searchTop}`}
@@ -470,13 +351,8 @@ export default function TrashbinsPanel() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Qidirish: nomi, ID, camera, driver..."
           />
-
-          <button className={Style.btnGhost} onClick={loadBins} disabled={loading}>
-            ↻ Refresh
-          </button>
-          <button className={Style.btnPrimary} onClick={openCreate}>
-            + Add Trashbin
-          </button>
+          <button className={Style.btnGhost} onClick={loadBins} disabled={loading}>↻ Yangilash</button>
+          <button className={Style.btnPrimary} onClick={openCreate}>+ Qo'shish</button>
         </div>
       </div>
 
@@ -495,15 +371,15 @@ export default function TrashbinsPanel() {
         </div>
       </div>
 
-      {err && <div className={Style.alertErr}>⚠️ {err}</div>}
-      {okMsg && <div className={Style.alertOk}>✅ {okMsg}</div>}
+      {err   && <div className={Style.alertErr}>⚠️ {err}</div>}
+      {okMsg && <div className={Style.alertOk}>{okMsg}</div>}
 
       <div className={Style.card}>
         <div className={Style.cardHead}>
           <div>
-            <div className={Style.cardTitle}>Ro‘yxat</div>
+            <div className={Style.cardTitle}>Ro'yxat</div>
             <div className={Style.cardHint}>
-              Backend’dan olinadi: <span className={Style.mono}>GET /proxy/trashbins</span> • Ko‘rinmoqda <span className={Style.mono}>{filteredBins.length}</span> / <span className={Style.mono}>{bins.length}</span>
+              Ko'rinmoqda <span className={Style.mono}>{filteredBins.length}</span> / <span className={Style.mono}>{bins.length}</span>
             </div>
           </div>
           <div className={Style.cardHint}>Sahifa <span className={Style.mono}>{currentPage}/{totalPages}</span></div>
@@ -519,28 +395,18 @@ export default function TrashbinsPanel() {
                 <th>Fill</th>
                 <th>Lat</th>
                 <th>Lng</th>
-                <th>Drivers</th>
-                <th>Actions</th>
+                <th>Haydovchilar</th>
+                <th>Amallar</th>
               </tr>
             </thead>
-
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={8} className={Style.tEmpty}>
-                    Yuklanmoqda…
-                  </td>
-                </tr>
+                <tr><td colSpan={8} className={Style.tEmpty}>Yuklanmoqda…</td></tr>
               ) : bins.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className={Style.tEmpty}>
-                    Hozircha trashbin yo‘q
-                  </td>
-                </tr>
+                <tr><td colSpan={8} className={Style.tEmpty}>Hozircha trashbin yo'q</td></tr>
               ) : (
                 pagedBins.map((b) => {
                   const isFull = b.status === "FULL" || num(b.fillLevel) >= 90;
-
                   return (
                     <tr key={b.id}>
                       <td className={Style.mono}>{b.id}</td>
@@ -556,23 +422,15 @@ export default function TrashbinsPanel() {
                       <td>
                         {b.drivers?.length ? (
                           <div className={Style.driverBadges}>
-                            {b.drivers.map((driver) => (
-                              <span key={driver.id} className={Style.driverBadge}>
-                                {getDriverDisplayName(driver)}
-                              </span>
+                            {b.drivers.map((d) => (
+                              <span key={d.id} className={Style.driverBadge}>{driverName(d)}</span>
                             ))}
                           </div>
-                        ) : (
-                          <span className={Style.mono}>—</span>
-                        )}
+                        ) : <span className={Style.mono}>—</span>}
                       </td>
                       <td className={Style.actions}>
-                        <button className={Style.btnSmall} onClick={() => openEdit(b)}>
-                          ✏️ Edit
-                        </button>
-                        <button className={Style.btnDanger} onClick={() => deleteBin(b.id)}>
-                          🗑️ Delete
-                        </button>
+                        <button className={Style.btnSmall} onClick={() => openEdit(b)}>✏️ Edit</button>
+                        <button className={Style.btnDanger} onClick={() => deleteBin(b.id)}>🗑️ Delete</button>
                       </td>
                     </tr>
                   );
@@ -582,52 +440,38 @@ export default function TrashbinsPanel() {
           </table>
         </div>
 
-        <Pagination
-          page={currentPage}
-          totalPages={totalPages}
-          onChange={setPage}
-        />
+        <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />
       </div>
 
+      {/* ===== MAIN MODAL ===== */}
       {open && (
-        <div
-          className={Style.backdrop}
-          onMouseDown={() => {
-            if (saving) return;
-            closeModal();
-          }}
-        >
-          <div
-            className={Style.modal}
-            onMouseDown={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-          >
+        <div className={Style.backdrop} onMouseDown={() => { if (!saving) closeModal(); }}>
+          <div className={Style.modal} onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+
+            {/* Header */}
             <div className={Style.modalHead}>
               <div>
                 <div className={Style.modalTitle}>
-                  {editing ? "✏️ Edit Trashbin" : "+ Add Trashbin"}
+                  {editing ? "✏️ Trashbin tahrirlash" : "+ Yangi trashbin qo'shish"}
                 </div>
                 <div className={Style.modalSub}>
-                  {editing
-                    ? "Faqat fill level va driverlar o‘zgaradi"
-                    : "Yangi trashbin qo‘shish"}
+                  {editing ? "Faqat fill level va haydovchilar o'zgaradi" : "Yangi trashbin ma'lumotlarini kiriting"}
                 </div>
               </div>
-
-              <button className={Style.iconBtn} onClick={closeModal} type="button">
-                ✕
-              </button>
+              <button className={Style.iconBtn} onClick={closeModal} type="button">✕</button>
             </div>
 
             {driversErr && (
-              <div className={Style.note}>ℹ️ Driver ro‘yxatini olishda muammo bo‘ldi.</div>
+              <div className={Style.note}>ℹ️ Haydovchilar ro'yxatini olishda muammo: {driversErr}</div>
             )}
 
+            {/* Body */}
             <div className={Style.modalBody}>
               <div className={Style.grid}>
+
+                {/* Name */}
                 <div className={Style.field}>
-                  <div className={Style.label}>Name</div>
+                  <div className={Style.label}>Nomi</div>
                   <input
                     className={Style.input}
                     value={form.name}
@@ -637,6 +481,7 @@ export default function TrashbinsPanel() {
                   />
                 </div>
 
+                {/* Camera ID */}
                 <div className={Style.field}>
                   <div className={Style.label}>Camera ID</div>
                   <input
@@ -648,6 +493,7 @@ export default function TrashbinsPanel() {
                   />
                 </div>
 
+                {/* Latitude */}
                 <div className={Style.field}>
                   <div className={Style.label}>Latitude</div>
                   <input
@@ -659,6 +505,7 @@ export default function TrashbinsPanel() {
                   />
                 </div>
 
+                {/* Longitude */}
                 <div className={Style.field}>
                   <div className={Style.label}>Longitude</div>
                   <input
@@ -670,8 +517,22 @@ export default function TrashbinsPanel() {
                   />
                 </div>
 
+                {/* Qutilar soni */}
                 <div className={Style.field}>
-                  <div className={Style.label}>Fill Level (0..100)</div>
+                  <div className={Style.label}>Qutilar soni</div>
+                  <input
+                    className={Style.input}
+                    type="number"
+                    min={1}
+                    value={form.binCount}
+                    onChange={(e) => setForm((s) => ({ ...s, binCount: e.target.value }))}
+                    placeholder="4"
+                  />
+                </div>
+
+                {/* Fill Level */}
+                <div className={Style.field}>
+                  <div className={Style.label}>To'lish darajasi (0–100)</div>
                   <input
                     className={Style.input}
                     type="number"
@@ -682,59 +543,135 @@ export default function TrashbinsPanel() {
                     placeholder="0"
                   />
                   <div className={Style.hint}>
-                    Hozirgi status:{" "}
+                    Status:{" "}
                     <span className={num(form.fillLevel) >= 90 ? Style.textRed : Style.textGreen}>
                       {num(form.fillLevel) >= 90 ? "FULL" : "EMPTY"}
                     </span>
                   </div>
                 </div>
 
-                <div className={Style.field}>
-                  <div className={Style.label}>Drivers</div>
-
-                  <div className={Style.driverPicker}>
-                    {drivers.length === 0 ? (
-                      <div className={Style.emptyDriverBox}>Driver topilmadi</div>
-                    ) : (
-                      drivers.map((d) => {
-                        const name = d.fullname || d.fullName || d.username || "No name";
-                        const checked = form.driverIds.includes(String(d.id));
-
-                        return (
-                          <label key={d.id} className={Style.driverItem}>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleDriverForForm(String(d.id))}
-                            />
-                            <span>
-                              #{d.id} • {name} ({d.username})
-                            </span>
-                          </label>
-                        );
-                      })
-                    )}
+                {/* Personnel Assignment */}
+                <div className={`${Style.field} ${Style.fieldFull}`}>
+                  <div className={Style.sectionLabel}>
+                    <span className={Style.sectionNum}>03</span>
+                    <span>Haydovchi biriktirish</span>
                   </div>
 
-                  <div className={Style.hint}>
-                    Bir trashbinga bir nechta driver biriktirish mumkin.
+                  {/* Selected driver cards */}
+                  <div className={Style.driverCards}>
+                    {selectedDriverObjs.map((d) => (
+                      <div key={d.id} className={Style.driverCard}>
+                        <div className={Style.driverCardIco}>🚚</div>
+                        <div className={Style.driverCardInfo}>
+                          <div className={Style.driverCardName}>{driverName(d)}</div>
+                          <div className={Style.driverCardSub}>{d.username}</div>
+                        </div>
+                        <button
+                          className={Style.driverCardCheck}
+                          type="button"
+                          onClick={() => removeDriver(String(d.id))}
+                          title="Olib tashlash"
+                        >
+                          ✓
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* + Assign button */}
+                    <button
+                      className={Style.assignBtn}
+                      type="button"
+                      onClick={() => { setDriverSearch(""); setDriverPickerOpen(true); }}
+                    >
+                      + Haydovchi biriktirish
+                    </button>
                   </div>
                 </div>
+
               </div>
             </div>
 
+            {/* Footer actions */}
             <div className={Style.modalActions}>
-              <button className={Style.btnGhost} onClick={closeModal} type="button">
-                Cancel
+              <button className={Style.btnDiscard} onClick={closeModal} type="button" disabled={saving}>
+                ✕ Bekor qilish
               </button>
-
               <button
-                className={Style.btnPrimary}
+                className={Style.btnRegister}
                 onClick={editing ? updateBin : createBin}
                 disabled={saving}
                 type="button"
               >
-                {saving ? "Saving..." : editing ? "Update" : "Save"}
+                {saving ? "Saqlanmoqda…" : editing ? "🖊 Saqlash" : "🗑 Ro'yxatga olish"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== DRIVER PICKER SUB-MODAL ===== */}
+      {open && driverPickerOpen && (
+        <div
+          className={Style.pickerBackdrop}
+          onMouseDown={() => setDriverPickerOpen(false)}
+        >
+          <div className={Style.pickerModal} onMouseDown={(e) => e.stopPropagation()}>
+            <div className={Style.pickerHead}>
+              <div>
+                <div className={Style.pickerTitle}>Haydovchi tanlash</div>
+                <div className={Style.pickerSub}>Mavjud haydovchilardan birini tanlang</div>
+              </div>
+              <button className={Style.iconBtn} type="button" onClick={() => setDriverPickerOpen(false)}>✕</button>
+            </div>
+
+            <div className={Style.pickerSearch}>
+              <span className={Style.pickerSearchIco}>🔍</span>
+              <input
+                className={Style.pickerSearchInput}
+                value={driverSearch}
+                onChange={(e) => setDriverSearch(e.target.value)}
+                placeholder="Ismi yoki username bo'yicha qidirish..."
+                autoFocus
+              />
+            </div>
+
+            {filteredDrivers.length > 0 && (
+              <div className={Style.pickerLabel}>MAVJUD HAYDOVCHILAR</div>
+            )}
+
+            <div className={Style.pickerList}>
+              {filteredDrivers.length === 0 ? (
+                <div className={Style.pickerEmpty}>Haydovchi topilmadi</div>
+              ) : (
+                filteredDrivers.map((d) => {
+                  const selected = form.driverIds.includes(String(d.id));
+                  return (
+                    <div
+                      key={d.id}
+                      className={`${Style.pickerItem} ${selected ? Style.pickerItemSelected : ""}`}
+                      onClick={() => toggleDriver(String(d.id))}
+                    >
+                      <div className={Style.pickerItemIco}>🚚</div>
+                      <div className={Style.pickerItemInfo}>
+                        <div className={Style.pickerItemName}>{driverName(d)}</div>
+                        <div className={Style.pickerItemSub}>@{d.username}</div>
+                      </div>
+                      <div className={`${Style.pickerRadio} ${selected ? Style.pickerRadioChecked : ""}`}>
+                        {selected && <span className={Style.pickerRadioDot}/>}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className={Style.pickerFoot}>
+              <button
+                className={Style.pickerCancelBtn}
+                type="button"
+                onClick={() => setDriverPickerOpen(false)}
+              >
+                Orqaga qaytish
               </button>
             </div>
           </div>
